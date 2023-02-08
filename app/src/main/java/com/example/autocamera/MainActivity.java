@@ -50,6 +50,8 @@ public class MainActivity extends AppCompatActivity {
                     if (!isCameraServiceRunning) {
                         cameraServiceIntent = new Intent(MainActivity.this, CameraService.class);
                         startService(cameraServiceIntent);
+                        //log message that says "Image taken"
+                        Log.d("MainActivity", "Image taken");
                         isCameraServiceRunning = true;
                         btnCapture.setText("Stop Capturing");
 
