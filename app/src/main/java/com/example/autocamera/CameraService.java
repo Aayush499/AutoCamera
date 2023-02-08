@@ -7,6 +7,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.Camera;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.WindowManager;
 
 import android.annotation.SuppressLint;
@@ -57,6 +59,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class CameraService extends Service {
     private long pictureInterval = 30000; // 30 seconds
@@ -69,7 +74,8 @@ public class CameraService extends Service {
     private CameraManager cameraManager;
     private String cameraId;
     private ImageReader imageReader;
-
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private ScheduledExecutorService executor;
     public CameraService() {
     }
 
@@ -93,21 +99,20 @@ public class CameraService extends Service {
     public void onCreate() {
         super.onCreate();
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        executor = Executors.newSingleThreadScheduledExecutor();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         //log message that states "Command started"
         Log.d(Tag, "Command started");
-        Timer timer = new Timer();
-        TimerTask timerTask = new TimerTask() {
+        executor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
                 takePicture();
             }
-        };
-        timer.scheduleAtFixedRate(timerTask, 0, 30 * 1000);
-        return super.onStartCommand(intent, flags, startId);
+        }, 0, 30, TimeUnit.SECONDS);
+        return START_STICKY;
     }
 
     @SuppressLint("MissingPermission")
@@ -120,18 +125,28 @@ public class CameraService extends Service {
 
     @SuppressLint("MissingPermission")
     private void takePicture() {
+
         CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
+            //log a message
+            Log.d(Tag, "Reached try");
             String cameraId = cameraManager.getCameraIdList()[0];
             final ImageReader imageReader = ImageReader.newInstance(1280, 720, ImageFormat.JPEG, 1);
             cameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
+
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
+    //log a message
+                    Log.d(Tag, "Reached onOpened");
                     try {
+                        //log that states "Reached onOpened
+                        Log.d(Tag, "Reached onOpened");
                         List<Surface> outputSurfaces = Arrays.asList(imageReader.getSurface());
                         camera.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
                             @Override
                             public void onConfigured(@NonNull CameraCaptureSession session) {
+                                //log a message
+                                Log.d(Tag, "Reached onConfigured");
                                 try {
                                     CaptureRequest.Builder builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
                                     builder.addTarget(imageReader.getSurface());
@@ -139,6 +154,8 @@ public class CameraService extends Service {
                                     session.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
                                         @Override
                                         public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+                                            //log a message
+                                            Log.d(Tag, "Reached onCaptureCompleted");
                                             super.onCaptureCompleted(session, request, result);
                                             Image image = imageReader.acquireLatestImage();
                                             if (image != null) {
@@ -158,6 +175,8 @@ public class CameraService extends Service {
 
                             @Override
                             public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                            //log that states "Failed to configure camera"
+                                Log.d(Tag, "Failed to configure camera");
 
                             }
                         }, null);
@@ -179,6 +198,8 @@ public class CameraService extends Service {
         }}
 
     private void saveImage(byte[] imageBytes) {
+        //log message that says "Saving image to Gallery"
+        Log.d(Tag, "Saving image to Gallery");
         File picturesDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
         File imageFile = new File(picturesDirectory, System.currentTimeMillis() + ".jpg");
         try {
@@ -186,6 +207,8 @@ public class CameraService extends Service {
             outputStream.write(imageBytes);
             outputStream.close();
 // Make the image visible in the gallery
+            //log message that says "Image saved to Gallery"
+            Log.d(Tag, "Image saved to Gallery");
             Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
             Uri contentUri = Uri.fromFile(imageFile);
             mediaScanIntent.setData(contentUri);
